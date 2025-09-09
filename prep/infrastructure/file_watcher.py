@@ -19,7 +19,7 @@ class StandardFileWatcher(FileWatcher):
             poll_interval: Time in seconds between file checks
         """
         self.poll_interval = poll_interval
-        self._stop_watching = False
+        self._watching = True
         self._last_position = 0
     
     def watch_file(self, file_path: str) -> Iterator[str]:
@@ -34,9 +34,9 @@ class StandardFileWatcher(FileWatcher):
             f.seek(0, 2)  # Seek to end of file
             self._last_position = f.tell()
         
-        self._stop_watching = False
+        self._watching = True
         
-        while not self._stop_watching:
+        while self._watching:
             try:
                 current_size = os.path.getsize(file_path)
                 
@@ -69,7 +69,7 @@ class StandardFileWatcher(FileWatcher):
     
     def stop_watching(self) -> None:
         """Stop watching the file."""
-        self._stop_watching = True
+        self._watching = False
 
 
 class ContextBuffer:
