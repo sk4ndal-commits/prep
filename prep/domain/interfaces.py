@@ -2,7 +2,6 @@
 
 from abc import ABC, abstractmethod
 from typing import Iterator, List, Optional
-from pathlib import Path
 
 from .models import FileMatch, SearchOptions, SearchResult, MatchResult
 

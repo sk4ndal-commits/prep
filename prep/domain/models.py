@@ -1,9 +1,9 @@
 """Domain models for prep - the Python grep implementation."""
 
+import re
 from dataclasses import dataclass
 from enum import Enum
-from typing import List, Optional, Pattern, Union
-import re
+from typing import List, Pattern
 
 
 class MatchType(Enum):

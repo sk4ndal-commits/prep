@@ -61,7 +61,8 @@ class StandardFileScanner(FileScanner):
                 except PermissionError:
                     continue
     
-    def _scan_directory_recursive(self, directory: Path) -> Iterator[str]:
+    @staticmethod
+    def _scan_directory_recursive(directory: Path) -> Iterator[str]:
         """Recursively scan a directory for files."""
         try:
             for item in directory.rglob('*'):

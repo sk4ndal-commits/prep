@@ -2,10 +2,10 @@
 
 import argparse
 import re
-from typing import List, Optional, Tuple
 import sys
+from typing import List, Optional, Tuple
 
-from ..domain.models import SearchPattern, SearchOptions, MatchType, RegexFlag
+from ..domain.models import SearchPattern, SearchOptions, MatchType
 
 
 class PrepArgumentParser:
@@ -14,7 +14,8 @@ class PrepArgumentParser:
     def __init__(self):
         self.parser = self._create_parser()
     
-    def _create_parser(self) -> argparse.ArgumentParser:
+    @staticmethod
+    def _create_parser() -> argparse.ArgumentParser:
         """Create the argument parser with all options."""
         parser = argparse.ArgumentParser(
             prog='prep',
@@ -266,7 +267,8 @@ Examples:
         
         return options, file_paths
     
-    def _extract_patterns(self, parsed: argparse.Namespace) -> List[str]:
+    @staticmethod
+    def _extract_patterns(parsed: argparse.Namespace) -> List[str]:
         """Extract patterns from parsed arguments."""
         patterns = []
         
@@ -280,7 +282,8 @@ Examples:
         
         return patterns
     
-    def _should_highlight(self, parsed: argparse.Namespace) -> bool:
+    @staticmethod
+    def _should_highlight(parsed: argparse.Namespace) -> bool:
         """Determine if matches should be highlighted."""
         if parsed.color == 'never':
             return False

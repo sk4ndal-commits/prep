@@ -93,8 +93,9 @@ class PrepApplication:
             if output:
                 print(output)
             return 0 if result.total_matches > 0 else 1
-    
-    def _read_from_stdin(self) -> List[str]:
+
+    @staticmethod
+    def _read_from_stdin() -> List[str]:
         """Read file paths from stdin."""
         try:
             lines = []
@@ -106,7 +107,8 @@ class PrepApplication:
         except (EOFError, KeyboardInterrupt):
             return []
     
-    def _validate_file_paths(self, file_paths: List[str], recursive: bool) -> List[str]:
+    @staticmethod
+    def _validate_file_paths(file_paths: List[str], recursive: bool) -> List[str]:
         """Validate and filter file paths."""
         valid_paths = []
         

@@ -2,10 +2,9 @@
 
 import signal
 import sys
-from typing import List, Optional
 
 from ..domain.interfaces import FileWatcher, PatternMatcher, OutputFormatter
-from ..domain.models import SearchOptions, MatchResult, FileMatch
+from ..domain.models import SearchOptions
 from ..infrastructure.file_watcher import ContextBuffer
 
 
@@ -60,8 +59,7 @@ class FileWatchUseCase:
             
             line_number = 0
             matches_found = False
-            pending_after_context = []
-            
+
             # Start watching the file
             for line in self.file_watcher.watch_file(file_path):
                 if self._stop_requested:
@@ -83,19 +81,15 @@ class FileWatchUseCase:
                         # Print before context
                         for before_line_num, before_line in context['before']:
                             self._print_context_line(
-                                file_path, before_line_num, before_line, 
-                                is_match=False, options=options
+                                before_line
                             )
                         
                         # Print the matching line with highlighting - clean output like tail -f | grep
                         highlighted_line = line
                         if options.highlight_matches and not options.count_only:
                             # Apply highlighting using the output formatter's method
-                            highlighted_line = self.output_formatter._highlight_matches(matches, line)
+                            highlighted_line = self.output_formatter.highlight_matches(matches, line)
                         print(highlighted_line, flush=True)
-                        
-                        # Set up after context tracking
-                        pending_after_context = []
                 
                 else:
                     # Check if this line should be included as after-context
@@ -106,8 +100,7 @@ class FileWatchUseCase:
                     if should_include_after and not options.quiet:
                         line_num, line_content = line_info
                         self._print_context_line(
-                            file_path, line_num, line_content,
-                            is_match=False, options=options
+                            line_content
                         )
                 
                 # Add line to buffer AFTER processing (for future before context)
@@ -124,14 +117,8 @@ class FileWatchUseCase:
             print(f"prep: error watching file: {e}", file=sys.stderr)
             return 2
     
-    def _print_context_line(
-        self, 
-        file_path: str, 
-        line_number: int, 
-        line_content: str, 
-        is_match: bool, 
-        options: SearchOptions
-    ) -> None:
+    @staticmethod
+    def _print_context_line(line_content: str) -> None:
         """Print a context line (before or after a match)."""
         # In file watching mode, print clean output without prefixes like tail -f | grep
         print(line_content, flush=True)

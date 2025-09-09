@@ -58,7 +58,7 @@ class StandardFileWatcher(FileWatcher):
                 
                 time.sleep(self.poll_interval)
                 
-            except (OSError, IOError) as e:
+            except (OSError, IOError):
                 # File might have been deleted or become inaccessible
                 if not Path(file_path).exists():
                     break

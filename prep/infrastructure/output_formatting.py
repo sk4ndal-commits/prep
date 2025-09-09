@@ -81,12 +81,13 @@ class StandardOutputFormatter(OutputFormatter):
         
         # Apply highlighting if requested
         if options.highlight_matches and not options.count_only:
-            line_content = self._highlight_matches([match], line_content)
+            line_content = self.highlight_matches([match], line_content)
         
         line_prefix = f"{match.line_number}:"
         return f"{file_prefix}{line_prefix}{line_content}"
     
-    def _format_count_result(self, result: SearchResult) -> str:
+    @staticmethod
+    def _format_count_result(result: SearchResult) -> str:
         """Format count-only result."""
         if len(result.file_matches) == 1:
             return str(result.total_matches)
@@ -107,7 +108,7 @@ class StandardOutputFormatter(OutputFormatter):
         
         # Apply highlighting if requested
         if options.highlight_matches and not options.count_only:
-            line_content = self._highlight_matches(matches, line_content)
+            line_content = self.highlight_matches(matches, line_content)
         
         # Format the line
         prefix_parts = []
@@ -118,7 +119,8 @@ class StandardOutputFormatter(OutputFormatter):
         prefix = ":".join(prefix_parts) + ":"
         return f"{prefix}{line_content}"
     
-    def _highlight_matches(self, matches: List[MatchResult], line_content: str) -> str:
+    @staticmethod
+    def highlight_matches(matches: List[MatchResult], line_content: str) -> str:
         """Apply ANSI highlighting to matches in a line."""
         if not matches:
             return line_content

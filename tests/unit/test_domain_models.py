@@ -1,7 +1,7 @@
 """Tests for domain models."""
 
-import pytest
 import re
+
 from prep.domain.models import (
     SearchPattern, MatchResult, FileMatch, SearchOptions, SearchResult,
     MatchType, RegexFlag

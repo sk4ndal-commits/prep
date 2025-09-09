@@ -1,11 +1,11 @@
 """Integration tests for CLI functionality."""
 
-import pytest
 import tempfile
-import os
 from pathlib import Path
+
+import pytest
+
 from prep.cli.application import PrepApplication
-from prep.domain.models import SearchPattern, SearchOptions
 
 
 class TestCLIIntegration:

@@ -1,10 +1,10 @@
 """Infrastructure implementation for pattern matching operations."""
 
 import re
-from typing import List, Pattern
+from typing import List
 
 from ..domain.interfaces import PatternMatcher
-from ..domain.models import SearchOptions, MatchResult, SearchPattern
+from ..domain.models import SearchOptions, MatchResult
 
 
 class RegexPatternMatcher(PatternMatcher):
@@ -97,7 +97,8 @@ class SimplePatternMatcher(PatternMatcher):
         else:
             return has_matches
     
-    def _is_word_boundary(self, text: str, start: int, end: int) -> bool:
+    @staticmethod
+    def _is_word_boundary(text: str, start: int, end: int) -> bool:
         """Check if the match is at word boundaries."""
         # Check start boundary
         if start > 0 and text[start - 1].isalnum():
