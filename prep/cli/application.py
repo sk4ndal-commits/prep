@@ -1,0 +1,120 @@
+"""Main CLI application for prep."""
+
+import sys
+from typing import List, Optional
+from pathlib import Path
+
+from .argument_parser import PrepArgumentParser
+from ..usecases.search_usecase import SearchUseCase, CountUseCase, QuietUseCase
+from ..infrastructure.file_operations import StandardFileReader, StandardFileScanner
+from ..infrastructure.pattern_matching import HybridPatternMatcher
+from ..infrastructure.output_formatting import StandardOutputFormatter
+from ..infrastructure.parallel_execution import AdaptiveExecutor
+from ..domain.models import SearchOptions
+
+
+class PrepApplication:
+    """Main application class for prep CLI."""
+    
+    def __init__(self):
+        self.arg_parser = PrepArgumentParser()
+        
+        # Initialize infrastructure components
+        self.file_reader = StandardFileReader()
+        self.file_scanner = StandardFileScanner()
+        self.pattern_matcher = HybridPatternMatcher()
+        self.output_formatter = StandardOutputFormatter()
+        self.parallel_executor = AdaptiveExecutor()
+        
+        # Initialize use cases
+        self.search_usecase = SearchUseCase(
+            file_reader=self.file_reader,
+            file_scanner=self.file_scanner,
+            pattern_matcher=self.pattern_matcher,
+            parallel_executor=self.parallel_executor
+        )
+        self.count_usecase = CountUseCase(self.search_usecase)
+        self.quiet_usecase = QuietUseCase(self.search_usecase)
+    
+    def run(self, args: Optional[List[str]] = None) -> int:
+        """Run the prep application and return exit code."""
+        try:
+            options, file_paths = self.arg_parser.parse_args(args)
+            return self._execute_search(options, file_paths)
+        except KeyboardInterrupt:
+            return 130  # Standard exit code for Ctrl+C
+        except Exception as e:
+            print(f"prep: error: {e}", file=sys.stderr)
+            return 2
+    
+    def _execute_search(self, options: SearchOptions, file_paths: List[str]) -> int:
+        """Execute the search operation."""
+        # Handle stdin input
+        if file_paths == ['-']:
+            file_paths = self._read_from_stdin()
+            if not file_paths:
+                return 1
+        
+        # Validate file paths
+        validated_paths = self._validate_file_paths(file_paths, options.recursive)
+        if not validated_paths:
+            print("prep: no valid files to search", file=sys.stderr)
+            return 2
+        
+        # Execute the appropriate use case
+        if options.quiet:
+            found_matches = self.quiet_usecase.execute(validated_paths, options)
+            return 0 if found_matches else 1
+        elif options.count_only:
+            result = self.count_usecase.execute(validated_paths, options)
+            output = self.output_formatter.format_result(result, options)
+            if output:
+                print(output)
+            return 0 if result.total_matches > 0 else 1
+        else:
+            result = self.search_usecase.execute(validated_paths, options)
+            output = self.output_formatter.format_result(result, options)
+            if output:
+                print(output)
+            return 0 if result.total_matches > 0 else 1
+    
+    def _read_from_stdin(self) -> List[str]:
+        """Read file paths from stdin."""
+        try:
+            lines = []
+            for line in sys.stdin:
+                line = line.strip()
+                if line:
+                    lines.append(line)
+            return lines
+        except (EOFError, KeyboardInterrupt):
+            return []
+    
+    def _validate_file_paths(self, file_paths: List[str], recursive: bool) -> List[str]:
+        """Validate and filter file paths."""
+        valid_paths = []
+        
+        for file_path in file_paths:
+            path = Path(file_path)
+            
+            if path.is_file():
+                valid_paths.append(str(path))
+            elif path.is_dir():
+                if recursive:
+                    valid_paths.append(str(path))
+                else:
+                    print(f"prep: {file_path}: Is a directory", file=sys.stderr)
+            else:
+                print(f"prep: {file_path}: No such file or directory", file=sys.stderr)
+        
+        return valid_paths
+
+
+def main() -> int:
+    """Main entry point for prep command."""
+    app = PrepApplication()
+    return app.run()
+
+
+if __name__ == '__main__':
+    sys.exit(main())
