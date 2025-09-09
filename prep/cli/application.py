@@ -6,10 +6,12 @@ from pathlib import Path
 
 from .argument_parser import PrepArgumentParser
 from ..usecases.search_usecase import SearchUseCase, CountUseCase, QuietUseCase
+from ..usecases.file_watch_usecase import FileWatchUseCase, FileWatchCountUseCase, FileWatchQuietUseCase
 from ..infrastructure.file_operations import StandardFileReader, StandardFileScanner
 from ..infrastructure.pattern_matching import HybridPatternMatcher
 from ..infrastructure.output_formatting import StandardOutputFormatter
 from ..infrastructure.parallel_execution import AdaptiveExecutor
+from ..infrastructure.file_watcher import StandardFileWatcher
 from ..domain.models import SearchOptions
 
 
@@ -25,6 +27,7 @@ class PrepApplication:
         self.pattern_matcher = HybridPatternMatcher()
         self.output_formatter = StandardOutputFormatter()
         self.parallel_executor = AdaptiveExecutor()
+        self.file_watcher = StandardFileWatcher()
         
         # Initialize use cases
         self.search_usecase = SearchUseCase(
@@ -35,6 +38,15 @@ class PrepApplication:
         )
         self.count_usecase = CountUseCase(self.search_usecase)
         self.quiet_usecase = QuietUseCase(self.search_usecase)
+        
+        # Initialize file watching use cases
+        self.file_watch_usecase = FileWatchUseCase(
+            file_watcher=self.file_watcher,
+            pattern_matcher=self.pattern_matcher,
+            output_formatter=self.output_formatter
+        )
+        self.file_watch_count_usecase = FileWatchCountUseCase(self.file_watch_usecase)
+        self.file_watch_quiet_usecase = FileWatchQuietUseCase(self.file_watch_usecase)
     
     def run(self, args: Optional[List[str]] = None) -> int:
         """Run the prep application and return exit code."""
@@ -49,6 +61,10 @@ class PrepApplication:
     
     def _execute_search(self, options: SearchOptions, file_paths: List[str]) -> int:
         """Execute the search operation."""
+        # Handle file watching mode
+        if options.follow:
+            return self._execute_file_watch(options, file_paths)
+        
         # Handle stdin input
         if file_paths == ['-']:
             file_paths = self._read_from_stdin()
@@ -108,6 +124,49 @@ class PrepApplication:
                 print(f"prep: {file_path}: No such file or directory", file=sys.stderr)
         
         return valid_paths
+    
+    def _execute_file_watch(self, options: SearchOptions, file_paths: List[str]) -> int:
+        """Execute file watching operation."""
+        # File watching only supports a single file
+        if len(file_paths) != 1:
+            print("prep: file watching (-f/--follow) requires exactly one file", file=sys.stderr)
+            return 2
+        
+        # No stdin support for file watching
+        if file_paths[0] == '-':
+            print("prep: file watching (-f/--follow) does not support stdin", file=sys.stderr)
+            return 2
+        
+        file_path = file_paths[0]
+        path = Path(file_path)
+        
+        # Validate file exists and is a regular file
+        if not path.exists():
+            print(f"prep: {file_path}: No such file or directory", file=sys.stderr)
+            return 2
+        
+        if not path.is_file():
+            print(f"prep: {file_path}: Not a regular file", file=sys.stderr)
+            return 2
+        
+        # File watching doesn't support recursive mode
+        if options.recursive:
+            print("prep: file watching (-f/--follow) does not support recursive (-r) mode", file=sys.stderr)
+            return 2
+        
+        # Execute the appropriate file watching use case
+        try:
+            if options.quiet:
+                return self.file_watch_quiet_usecase.execute(file_path, options)
+            elif options.count_only:
+                return self.file_watch_count_usecase.execute(file_path, options)
+            else:
+                return self.file_watch_usecase.watch_and_search(file_path, options)
+        except KeyboardInterrupt:
+            return 130  # Standard exit code for Ctrl+C
+        except Exception as e:
+            print(f"prep: error in file watching: {e}", file=sys.stderr)
+            return 2
 
 
 def main() -> int:

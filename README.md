@@ -22,6 +22,7 @@ A powerful, feature-rich Python implementation of grep with advanced pattern mat
 - **Binary file handling**: Automatically detect and handle binary files
 - **Parallel search**: Speed up searches across multiple files using threads
 - **Regex flags**: Support for case-insensitive matching and other regex options
+- **File watching (-f/--follow)**: Watch files for changes and match patterns in new lines (like tail -f | grep)
 
 ## Architecture
 
@@ -100,6 +101,15 @@ python prep.py --threads 4 "pattern" *.txt
 
 # Fixed string search (disable regex)
 python prep.py -F "literal.string" file.txt
+
+# File watching (like tail -f | grep)
+python prep.py -f "ERROR" /var/log/app.log
+
+# File watching with context lines
+python prep.py -f -A 2 -B 1 "error" /var/log/app.log
+
+# File watching with case-insensitive matching
+python prep.py -f -i "warning" /var/log/app.log
 ```
 
 ## Command Line Options
@@ -136,6 +146,9 @@ python prep.py -F "literal.string" file.txt
 
 ### Performance Options
 - `--threads N`: Use N threads for parallel processing
+
+### File Watching Options
+- `-f, --follow`: Watch file for changes and match patterns in new lines (like tail -f | grep)
 
 ### Regex Options
 - `-F, --fixed-strings`: Interpret patterns as fixed strings (not regex)

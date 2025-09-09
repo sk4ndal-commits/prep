@@ -77,6 +77,7 @@ class SearchOptions:
     recursive: bool = False
     ignore_binary: bool = True
     max_threads: int = 1
+    follow: bool = False
     
     @property
     def context_around(self) -> int:

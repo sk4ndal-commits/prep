@@ -82,6 +82,20 @@ class SearchService(ABC):
         pass
 
 
+class FileWatcher(ABC):
+    """Interface for watching file changes."""
+    
+    @abstractmethod
+    def watch_file(self, file_path: str) -> Iterator[str]:
+        """Watch a file for new lines and yield them as they are added."""
+        pass
+    
+    @abstractmethod
+    def stop_watching(self) -> None:
+        """Stop watching the file."""
+        pass
+
+
 class ParallelExecutor(ABC):
     """Interface for parallel execution of search operations."""
     

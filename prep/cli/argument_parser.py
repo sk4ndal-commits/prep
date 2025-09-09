@@ -30,6 +30,8 @@ Examples:
   prep -x "exact line" file.txt              # Line match
   prep -A 3 -B 2 "pattern" file.txt         # Context lines
   prep -i "pattern" file.txt                 # Case insensitive
+  prep -f "pattern" file.txt                 # Watch file for changes (like tail -f | grep)
+  prep -f -A 2 -B 1 "error" /var/log/app.log # Watch log with context
             """,
             formatter_class=argparse.RawDescriptionHelpFormatter
         )
@@ -181,6 +183,13 @@ Examples:
             help='Use extended regular expressions',
         )
         
+        # File watching options
+        parser.add_argument(
+            '-f', '--follow',
+            action='store_true',
+            help='Watch file for changes and match patterns in new lines (like tail -f | grep)',
+        )
+        
         return parser
     
     def parse_args(self, args: Optional[List[str]] = None) -> Tuple[SearchOptions, List[str]]:
@@ -239,7 +248,8 @@ Examples:
             highlight_matches=highlight_matches,
             recursive=parsed.recursive,
             ignore_binary=ignore_binary,
-            max_threads=parsed.threads
+            max_threads=parsed.threads,
+            follow=parsed.follow
         )
         
         # Get file paths - when using -e, treat positional pattern as file path
