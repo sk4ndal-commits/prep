@@ -51,7 +51,7 @@ def test_basic_file_watching():
         writer_thread.start()
         
         # Run prep with file watching
-        cmd = [sys.executable, "../../prep.py", "-f", "ERROR", test_file]
+        cmd = [sys.executable, "./prep.py", "-f", "ERROR", test_file]
         print(f"Running: {' '.join(cmd)}")
         
         # Run for a limited time
@@ -78,14 +78,13 @@ def test_basic_file_watching():
         # Check if we got the expected matches
         if "ERROR: Something went wrong" in stdout and "ERROR: Another error occurred" in stdout:
             print("✅ Basic file watching test PASSED")
-            return True
         else:
             print("❌ Basic file watching test FAILED")
-            return False
+            assert False, "Expected ERROR messages not found in stdout"
     
     except Exception as e:
         print(f"❌ Basic file watching test FAILED with exception: {e}")
-        return False
+        assert False, f"Test failed with exception: {e}"
     
     finally:
         # Cleanup
@@ -123,7 +122,7 @@ def test_file_watching_with_context():
         writer_thread.start()
         
         # Run prep with file watching and context
-        cmd = [sys.executable, "../../prep.py", "-f", "-A", "2", "-B", "1", "ERROR", test_file]
+        cmd = [sys.executable, "./prep.py", "-f", "-A", "2", "-B", "1", "ERROR", test_file]
         print(f"Running: {' '.join(cmd)}")
         
         process = subprocess.Popen(
@@ -151,14 +150,13 @@ def test_file_watching_with_context():
             "Line before error 2" in stdout and
             "Line after error 1" in stdout):
             print("✅ File watching with context test PASSED")
-            return True
         else:
             print("❌ File watching with context test FAILED")
-            return False
+            assert False, "Expected ERROR message with context lines not found in stdout"
     
     except Exception as e:
         print(f"❌ File watching with context test FAILED with exception: {e}")
-        return False
+        assert False, f"Test failed with exception: {e}"
     
     finally:
         # Cleanup
@@ -172,7 +170,7 @@ def test_file_watching_validation():
     
     try:
         # Test multiple files (should fail)
-        cmd = [sys.executable, "../../prep.py", "-f", "pattern", "file1.txt", "file2.txt"]
+        cmd = [sys.executable, "./prep.py", "-f", "pattern", "file1.txt", "file2.txt"]
         result = subprocess.run(cmd, capture_output=True, text=True)
         
         if result.returncode == 2 and "requires exactly one file" in result.stderr:
@@ -183,7 +181,7 @@ def test_file_watching_validation():
             multiple_files_passed = False
         
         # Test stdin (should fail)
-        cmd = [sys.executable, "../../prep.py", "-f", "pattern", "-"]
+        cmd = [sys.executable, "./prep.py", "-f", "pattern", "-"]
         result = subprocess.run(cmd, capture_output=True, text=True)
         
         if result.returncode == 2 and "does not support stdin" in result.stderr:
@@ -194,7 +192,7 @@ def test_file_watching_validation():
             stdin_passed = False
         
         # Test nonexistent file (should fail)
-        cmd = [sys.executable, "../../prep.py", "-f", "pattern", "nonexistent_file.txt"]
+        cmd = [sys.executable, "./prep.py", "-f", "pattern", "nonexistent_file.txt"]
         result = subprocess.run(cmd, capture_output=True, text=True)
         
         if result.returncode == 2 and "No such file or directory" in result.stderr:
@@ -204,11 +202,12 @@ def test_file_watching_validation():
             print(f"❌ Nonexistent file validation test FAILED: {result.stderr}")
             nonexistent_passed = False
         
-        return multiple_files_passed and stdin_passed and nonexistent_passed
+        # Assert all validation tests passed
+        assert multiple_files_passed and stdin_passed and nonexistent_passed, "One or more validation tests failed"
     
     except Exception as e:
         print(f"❌ File watching validation tests FAILED with exception: {e}")
-        return False
+        assert False, f"Test failed with exception: {e}"
 
 
 def main():
