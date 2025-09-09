@@ -51,7 +51,7 @@ def test_basic_file_watching():
         writer_thread.start()
         
         # Run prep with file watching
-        cmd = [sys.executable, "prep.py", "-f", "ERROR", test_file]
+        cmd = [sys.executable, "../../prep.py", "-f", "ERROR", test_file]
         print(f"Running: {' '.join(cmd)}")
         
         # Run for a limited time
@@ -123,7 +123,7 @@ def test_file_watching_with_context():
         writer_thread.start()
         
         # Run prep with file watching and context
-        cmd = [sys.executable, "prep.py", "-f", "-A", "2", "-B", "1", "ERROR", test_file]
+        cmd = [sys.executable, "../../prep.py", "-f", "-A", "2", "-B", "1", "ERROR", test_file]
         print(f"Running: {' '.join(cmd)}")
         
         process = subprocess.Popen(
@@ -172,7 +172,7 @@ def test_file_watching_validation():
     
     try:
         # Test multiple files (should fail)
-        cmd = [sys.executable, "prep.py", "-f", "pattern", "file1.txt", "file2.txt"]
+        cmd = [sys.executable, "../../prep.py", "-f", "pattern", "file1.txt", "file2.txt"]
         result = subprocess.run(cmd, capture_output=True, text=True)
         
         if result.returncode == 2 and "requires exactly one file" in result.stderr:
@@ -183,7 +183,7 @@ def test_file_watching_validation():
             multiple_files_passed = False
         
         # Test stdin (should fail)
-        cmd = [sys.executable, "prep.py", "-f", "pattern", "-"]
+        cmd = [sys.executable, "../../prep.py", "-f", "pattern", "-"]
         result = subprocess.run(cmd, capture_output=True, text=True)
         
         if result.returncode == 2 and "does not support stdin" in result.stderr:
@@ -194,7 +194,7 @@ def test_file_watching_validation():
             stdin_passed = False
         
         # Test nonexistent file (should fail)
-        cmd = [sys.executable, "prep.py", "-f", "pattern", "nonexistent_file.txt"]
+        cmd = [sys.executable, "../../prep.py", "-f", "pattern", "nonexistent_file.txt"]
         result = subprocess.run(cmd, capture_output=True, text=True)
         
         if result.returncode == 2 and "No such file or directory" in result.stderr:
