@@ -48,8 +48,8 @@ class SimplePatternMatcher(PatternMatcher):
         
         for pattern in options.patterns:
             if pattern.is_regex:
-                # Delegate to regex matcher for regex patterns
-                return RegexPatternMatcher().find_matches(content, line_number, options)
+                # Skip regex patterns in simple matcher - they should be handled by regex matcher
+                continue
             
             search_text = pattern.pattern
             search_content = content

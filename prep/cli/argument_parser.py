@@ -242,8 +242,17 @@ Examples:
             max_threads=parsed.threads
         )
         
-        # Get file paths (use stdin if none provided)
-        file_paths = parsed.files if parsed.files else ['-']
+        # Get file paths - when using -e, treat positional pattern as file path
+        file_paths = list(parsed.files)  # Copy the files list
+        if parsed.patterns and parsed.pattern:
+            # When -e patterns are used, treat the positional pattern as a file path
+            file_paths.append(parsed.pattern)
+        
+        # If no files specified, default to stdin
+        if not file_paths:
+            if parsed.patterns:
+                self.parser.error("When using -e/--regexp, you must specify files to search")
+            file_paths = ['-']
         
         return options, file_paths
     
@@ -255,8 +264,8 @@ Examples:
         if parsed.patterns:
             patterns.extend(parsed.patterns)
         
-        # Add the main pattern argument
-        if parsed.pattern:
+        # Add the main pattern argument only if no -e patterns were specified
+        if parsed.pattern and not parsed.patterns:
             patterns.append(parsed.pattern)
         
         return patterns
