@@ -126,29 +126,85 @@ class SearchUseCase:
         
         matches = []
         try:
-            for line_number, line_content in enumerate(self._file_reader.read_lines(file_path), 1):
-                line_matches = self._pattern_matcher.find_matches(line_content, line_number, options)
-                
-                # Apply invert match logic
-                should_include = self._pattern_matcher.should_include_line(line_matches, options)
-                
-                if should_include:
-                    if options.invert_match:
-                        # For invert match, create a dummy match result
-                        matches.append(MatchResult(
-                            line_number=line_number,
-                            line_content=line_content,
-                            match_start=0,
-                            match_end=0,
-                            pattern=options.patterns[0] if options.patterns else None
-                        ))
-                    else:
-                        matches.extend(line_matches)
+            # Read all lines if context is needed
+            if options.context_before > 0 or options.context_after > 0:
+                all_lines = list(self._file_reader.read_lines(file_path))
+                matches = self._search_with_context(all_lines, options)
+            else:
+                for line_number, line_content in enumerate(self._file_reader.read_lines(file_path), 1):
+                    line_matches = self._pattern_matcher.find_matches(line_content, line_number, options)
+                    
+                    # Apply invert match logic
+                    should_include = self._pattern_matcher.should_include_line(line_matches, options)
+                    
+                    if should_include:
+                        if options.invert_match:
+                            # For invert match, create a dummy match result
+                            matches.append(MatchResult(
+                                line_number=line_number,
+                                line_content=line_content,
+                                match_start=0,
+                                match_end=0,
+                                pattern=options.patterns[0] if options.patterns else None
+                            ))
+                        else:
+                            matches.extend(line_matches)
         except (UnicodeDecodeError, IOError):
             # Handle files that can't be read as text
             pass
         
         return FileMatch(file_path=file_path, matches=matches, is_binary=is_binary)
+    
+    def _search_with_context(self, all_lines: List[str], options: SearchOptions) -> List[MatchResult]:
+        """Search through lines and include context lines."""
+        matches = []
+        matching_line_numbers = set()
+        
+        # First pass: find all matching lines
+        for line_number, line_content in enumerate(all_lines, 1):
+            line_matches = self._pattern_matcher.find_matches(line_content, line_number, options)
+            should_include = self._pattern_matcher.should_include_line(line_matches, options)
+            
+            if should_include:
+                matching_line_numbers.add(line_number)
+                if options.invert_match:
+                    matches.append(MatchResult(
+                        line_number=line_number,
+                        line_content=line_content,
+                        match_start=0,
+                        match_end=0,
+                        pattern=options.patterns[0] if options.patterns else None
+                    ))
+                else:
+                    matches.extend(line_matches)
+        
+        # Second pass: add context lines
+        context_lines = set()
+        for match_line_num in matching_line_numbers:
+            # Add before context
+            for i in range(max(1, match_line_num - options.context_before), match_line_num):
+                context_lines.add(i)
+            # Add after context  
+            for i in range(match_line_num + 1, min(len(all_lines) + 1, match_line_num + options.context_after + 1)):
+                context_lines.add(i)
+        
+        # Create context match results
+        all_result_matches = matches[:]  # Copy existing matches
+        for line_number, line_content in enumerate(all_lines, 1):
+            if line_number in context_lines and line_number not in matching_line_numbers:
+                # Create a context match result (no highlighting)
+                context_match = MatchResult(
+                    line_number=line_number,
+                    line_content=line_content,
+                    match_start=-1,  # Use -1 to indicate context line
+                    match_end=-1,
+                    pattern=None
+                )
+                all_result_matches.append(context_match)
+        
+        # Sort by line number
+        all_result_matches.sort(key=lambda m: m.line_number)
+        return all_result_matches
 
 
 class CountUseCase:

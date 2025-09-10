@@ -141,24 +141,35 @@ class StandardOutputFormatter(OutputFormatter):
     def _format_with_context(self, file_match: FileMatch, options: SearchOptions, matches_by_line: Dict[int, List[MatchResult]]) -> List[str]:
         """Format matches with context lines."""
         output_lines = []
-        
-        # This would require access to file content for context lines
-        # For now, implement basic context-aware formatting
         line_numbers = sorted(matches_by_line.keys())
         
         for i, line_number in enumerate(line_numbers):
             matches = matches_by_line[line_number]
             
-            # Add separator if there's a gap
+            # Add separator if there's a gap between context groups
             if i > 0 and line_number - line_numbers[i-1] > 1:
                 output_lines.append("--")
             
-            # Format the match line
-            formatted_line = self._format_match_line_group(
-                matches, file_match.file_path, options
-            )
-            if formatted_line:
+            # Check if this is a context line or actual match
+            is_context_line = all(m.match_start == -1 for m in matches)
+            
+            if is_context_line:
+                # Format context line (no highlighting)
+                context_match = matches[0]
+                prefix_parts = []
+                if len([fm for fm in [file_match.file_path] if fm]) > 1:  # Multiple files
+                    prefix_parts.append(file_match.file_path)
+                prefix_parts.append(str(context_match.line_number))
+                prefix = "-".join(prefix_parts) + "-"  # Use - for context lines
+                formatted_line = f"{prefix}{context_match.line_content}"
                 output_lines.append(formatted_line)
+            else:
+                # Format actual match line (with highlighting)
+                formatted_line = self._format_match_line_group(
+                    matches, file_match.file_path, options
+                )
+                if formatted_line:
+                    output_lines.append(formatted_line)
         
         return output_lines
 
