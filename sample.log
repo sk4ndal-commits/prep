@@ -1,0 +1,12 @@
+2025-10-10 08:00:01 INFO Start processing
+2025-10-10 08:00:02 DEBUG Loading configuration
+2025-10-10 08:00:03 INFO User login: alice
+2025-10-10 08:00:04 WARN Disk space low
+2025-10-10 08:00:05 ERROR Failed to connect to database
+2025-10-10 08:00:06 INFO Retrying connection
+2025-10-10 08:00:07 INFO Connection established
+2025-10-10 08:00:08 INFO Processing data
+2025-10-10 08:00:09 DEBUG Data chunk processed
+2025-10-10 08:00:10 INFO User logout: alice
+2025-10-10 08:00:11 INFO End processing
+

@@ -9,6 +9,7 @@ from ..domain.interfaces import (
 from ..domain.models import (
     SearchOptions, SearchResult, FileMatch, MatchResult, SearchPattern
 )
+from ..infrastructure.pattern_matching import LogicalPatternMatcher
 
 
 class SearchUseCase:
@@ -30,10 +31,16 @@ class SearchUseCase:
         """Execute the search operation."""
         # Scan for files
         all_files = list(self._file_scanner.scan_files(file_paths, options.recursive))
-        
         if not all_files:
             return SearchResult.empty()
-        
+        # Entscheide, ob logischer Matcher verwendet werden soll
+        use_logical = False
+        if len(options.patterns) == 1:
+            p = options.patterns[0].pattern
+            if any(op in p for op in ['&', '|']) or ('(' in p and ')' in p):
+                use_logical = True
+        if use_logical:
+            self._pattern_matcher = LogicalPatternMatcher(options.patterns[0].pattern, options)
         # Search files in parallel if configured
         if options.max_threads > 1 and self._parallel_executor and len(all_files) > 1:
             return self._search_parallel(all_files, options)
@@ -124,35 +131,24 @@ class SearchUseCase:
         if is_binary and options.ignore_binary:
             return FileMatch(file_path=file_path, matches=[], is_binary=True)
         
-        matches = []
-        try:
-            # Read all lines if context is needed
-            if options.context_before > 0 or options.context_after > 0:
-                all_lines = list(self._file_reader.read_lines(file_path))
-                matches = self._search_with_context(all_lines, options)
-            else:
-                for line_number, line_content in enumerate(self._file_reader.read_lines(file_path), 1):
-                    line_matches = self._pattern_matcher.find_matches(line_content, line_number, options)
-                    
-                    # Apply invert match logic
-                    should_include = self._pattern_matcher.should_include_line(line_matches, options)
-                    
-                    if should_include:
-                        if options.invert_match:
-                            # For invert match, create a dummy match result
-                            matches.append(MatchResult(
-                                line_number=line_number,
-                                line_content=line_content,
-                                match_start=0,
-                                match_end=0,
-                                pattern=options.patterns[0] if options.patterns else None
-                            ))
-                        else:
-                            matches.extend(line_matches)
-        except (UnicodeDecodeError, IOError):
-            # Handle files that can't be read as text
-            pass
-        
+        all_lines = list(self._file_reader.read_lines(file_path))
+        # Kontextlogik anwenden, falls Kontextoptionen gesetzt sind
+        if options.context_before > 0 or options.context_after > 0:
+            matches = self._search_with_context(all_lines, options)
+        else:
+            matches = []
+            line_number = 0
+            for line in all_lines:
+                line_number += 1
+                line_matches = self._pattern_matcher.find_matches(line, line_number, options)
+                include = self._pattern_matcher.should_include_line(line_matches, options)
+                if include:
+                    if options.invert_match:
+                        # Bei invert_match: Zeile ohne Treffer als MatchResult speichern
+                        matches.append(MatchResult(line_number=line_number, line_content=line, match_start=-1, match_end=-1, pattern=None))
+                    else:
+                        matches.extend(line_matches)
+
         return FileMatch(file_path=file_path, matches=matches, is_binary=is_binary)
     
     def _search_with_context(self, all_lines: List[str], options: SearchOptions) -> List[MatchResult]:

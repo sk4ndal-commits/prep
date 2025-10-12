@@ -92,6 +92,9 @@ class PrepApplication:
             output = self.output_formatter.format_result(result, options)
             if output:
                 print(output)
+            # Exit-Code-Logik für invert_match
+            if options.invert_match:
+                return 0 if result.total_matches > 0 else 1
             return 0 if result.total_matches > 0 else 1
 
     @staticmethod

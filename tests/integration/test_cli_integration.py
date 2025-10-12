@@ -176,3 +176,13 @@ class TestCLIIntegration:
         
         exit_code = app.run(["test", "/nonexistent/file.txt"])
         assert exit_code == 2  # Error exit code
+
+    def test_logical_pattern_search(self):
+        """Test logical pattern search with (A|B)&C."""
+        test_file = Path(self.temp_dir) / "logic.txt"
+        test_file.write_text("AC\nBC\nA\nB\nC\nA B C\nfoo bar\n")
+        app = PrepApplication()
+        # Suche nach Zeilen, die A oder B und zusätzlich C enthalten
+        exit_code = app.run(["(A|B)&C", str(test_file)])
+        assert exit_code == 0
+        # Optional: weitere Validierung des Outputs möglich
