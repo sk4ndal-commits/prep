@@ -32,16 +32,19 @@ class StandardOutputFormatter(OutputFormatter):
         if options.count_only:
             return self._format_count_result(result)
         
+        # Show filename prefix for multiple files
+        show_filename = len(result.file_matches) > 1
+        
         output_lines = []
         for file_match in result.file_matches:
             if file_match.matches:
-                formatted = self.format_file_match(file_match, options)
+                formatted = self.format_file_match(file_match, options, show_filename)
                 if formatted:
                     output_lines.append(formatted)
         
         return '\n'.join(output_lines)
     
-    def format_file_match(self, file_match: FileMatch, options: SearchOptions) -> str:
+    def format_file_match(self, file_match: FileMatch, options: SearchOptions, show_filename: bool = False) -> str:
         """Format matches from a single file."""
         if not file_match.matches:
             return ""
@@ -58,13 +61,13 @@ class StandardOutputFormatter(OutputFormatter):
         
         # Handle context lines
         if options.context_before > 0 or options.context_after > 0:
-            output_lines.extend(self._format_with_context(file_match, options, matches_by_line))
+            output_lines.extend(self._format_with_context(file_match, options, matches_by_line, show_filename))
         else:
             # Simple format without context
             for line_number in sorted(matches_by_line.keys()):
                 matches = matches_by_line[line_number]
                 formatted_line = self._format_match_line_group(
-                    matches, file_match.file_path, options
+                    matches, file_match.file_path, options, show_filename
                 )
                 if formatted_line:
                     output_lines.append(formatted_line)
@@ -89,15 +92,18 @@ class StandardOutputFormatter(OutputFormatter):
     @staticmethod
     def _format_count_result(result: SearchResult) -> str:
         """Format count-only result."""
+        # Single file: print only the number
         if len(result.file_matches) == 1:
-            return str(result.total_matches)
+            file_match = result.file_matches[0]
+            return str(file_match.match_count)
         
+        # Multiple files: print filename:count per file
         lines = []
         for file_match in result.file_matches:
             lines.append(f"{file_match.file_path}:{file_match.match_count}")
         return '\n'.join(lines)
     
-    def _format_match_line_group(self, matches: List[MatchResult], file_path: str, options: SearchOptions) -> str:
+    def _format_match_line_group(self, matches: List[MatchResult], file_path: str, options: SearchOptions, show_filename: bool = False) -> str:
         """Format a group of matches on the same line."""
         if not matches:
             return ""
@@ -112,7 +118,7 @@ class StandardOutputFormatter(OutputFormatter):
         
         # Format the line
         prefix_parts = []
-        if len([fm for fm in [file_path] if fm]) > 1:  # Multiple files
+        if show_filename:
             prefix_parts.append(file_path)
         prefix_parts.append(str(representative_match.line_number))
         
@@ -138,7 +144,7 @@ class StandardOutputFormatter(OutputFormatter):
         
         return highlighted_content
     
-    def _format_with_context(self, file_match: FileMatch, options: SearchOptions, matches_by_line: Dict[int, List[MatchResult]]) -> List[str]:
+    def _format_with_context(self, file_match: FileMatch, options: SearchOptions, matches_by_line: Dict[int, List[MatchResult]], show_filename: bool = False) -> List[str]:
         """Format matches with context lines."""
         output_lines = []
         line_numbers = sorted(matches_by_line.keys())
@@ -157,7 +163,7 @@ class StandardOutputFormatter(OutputFormatter):
                 # Format context line (no highlighting)
                 context_match = matches[0]
                 prefix_parts = []
-                if len([fm for fm in [file_match.file_path] if fm]) > 1:  # Multiple files
+                if show_filename:
                     prefix_parts.append(file_match.file_path)
                 prefix_parts.append(str(context_match.line_number))
                 prefix = "-".join(prefix_parts) + "-"  # Use - for context lines
@@ -166,7 +172,7 @@ class StandardOutputFormatter(OutputFormatter):
             else:
                 # Format actual match line (with highlighting)
                 formatted_line = self._format_match_line_group(
-                    matches, file_match.file_path, options
+                    matches, file_match.file_path, options, show_filename
                 )
                 if formatted_line:
                     output_lines.append(formatted_line)

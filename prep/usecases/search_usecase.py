@@ -9,6 +9,7 @@ from ..domain.interfaces import (
 from ..domain.models import (
     SearchOptions, SearchResult, FileMatch, MatchResult, SearchPattern
 )
+from ..infrastructure.chronological_merge import merge_chronologically
 
 
 class SearchUseCase:
@@ -59,11 +60,17 @@ class SearchUseCase:
                 if options.quiet:
                     break
         
-        return SearchResult(
+        result = SearchResult(
             file_matches=file_matches,
             total_matches=total_matches,
             files_with_matches=files_with_matches
         )
+        
+        # Apply chronological merging for multi-file searches (not in count mode)
+        if len(file_paths) > 1 and not options.count_only:
+            result = merge_chronologically(result)
+        
+        return result
     
     def _search_parallel(self, file_paths: List[str], options: SearchOptions) -> SearchResult:
         """Search files in parallel."""
@@ -108,11 +115,17 @@ class SearchUseCase:
                 files_with_matches += 1
                 total_matches += len(file_match.matches)
         
-        return SearchResult(
+        result = SearchResult(
             file_matches=file_matches,
             total_matches=total_matches,
             files_with_matches=files_with_matches
         )
+        
+        # Apply chronological merging for multi-file searches (not in count mode)
+        if len(file_paths) > 1 and not options.count_only:
+            result = merge_chronologically(result)
+        
+        return result
     
     def _search_single_file(self, file_path: str, options: SearchOptions) -> FileMatch:
         """Search for patterns in a single file."""

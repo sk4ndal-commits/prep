@@ -1,6 +1,7 @@
 """Command-line argument parser for prep."""
 
 import argparse
+import os
 import re
 import sys
 from typing import List, Optional, Tuple
@@ -22,40 +23,37 @@ class PrepArgumentParser:
             description='prep - Python grep implementation',
             epilog="""
 Examples:
-  prep "pattern" file.txt                    # Basic search
-  prep -v "pattern" file.txt                 # Invert match
-  prep -c "pattern" *.txt                    # Count matches
-  prep -r "pattern" /path/to/directory       # Recursive search
-  prep -e "pat1" -e "pat2" file.txt         # Multiple patterns
-  prep -w "word" file.txt                    # Word match
-  prep -x "exact line" file.txt              # Line match
-  prep -A 3 -B 2 "pattern" file.txt         # Context lines
-  prep -i "pattern" file.txt                 # Case insensitive
-  prep -f "pattern" file.txt                 # Watch file for changes (like tail -f | grep)
-  prep -f -A 2 -B 1 "error" /var/log/app.log # Watch log with context
+  prep -r "pattern" file.txt                      # Basic search
+  prep -r "pattern" -v file.txt                   # Invert match
+  prep -r "pattern" -c *.txt                      # Count matches
+  prep -r "pattern" -R /path/to/directory         # Recursive search
+  prep -r "error|warning|fatal" app.log           # OR pattern matching
+  prep -r "timeout&retry" app.log                 # AND pattern matching
+  prep -r "error&(database|network)" app.log      # Complex Boolean expressions
+  prep -r "test" -w code.txt                      # Word match
+  prep -r "error" -x log.txt                      # Line match
+  prep -r "panic" -B 2 server.log                 # Context lines before
+  prep -r "ERROR" -A 3 app.log                    # Context lines after
+  prep -r "exception" -C 2 trace.log              # Context before and after
+  prep -r "pattern" -i file.txt                   # Case insensitive
+  prep -r "ERROR" -f /var/log/app.log             # Watch file for changes
+  prep -r "error" -j 4 logs/*.txt                 # Use 4 threads
             """,
             formatter_class=argparse.RawDescriptionHelpFormatter
         )
         
-        # Positional arguments
+        # Pattern argument
         parser.add_argument(
-            'pattern',
-            nargs='?',
-            help='Search pattern (required unless using -e)',
+            '-r', '--regexp',
+            dest='pattern',
+            help='Search pattern (regex)',
         )
         
+        # Positional arguments for files
         parser.add_argument(
             'files',
             nargs='*',
             help='Files to search in (stdin if not specified)',
-        )
-        
-        # Basic options
-        parser.add_argument(
-            '-e', '--regexp',
-            action='append',
-            dest='patterns',
-            help='Specify pattern (can be used multiple times)',
         )
         
         parser.add_argument(
@@ -94,6 +92,13 @@ Examples:
             '-i', '--ignore-case',
             action='store_true',
             help='Ignore case distinctions',
+        )
+        
+        # Regex options
+        parser.add_argument(
+            '--dotall',
+            action='store_true',
+            help='Make dot (.) match newline characters',
         )
         
         # Output options
@@ -149,7 +154,7 @@ Examples:
         
         # Directory options
         parser.add_argument(
-            '-r', '--recursive',
+            '-R', '--recursive',
             action='store_true',
             help='Recursively search directories',
         )
@@ -163,12 +168,13 @@ Examples:
         )
         
         # Performance options
+        default_threads = os.environ.get('RGREP_THREADS')
         parser.add_argument(
-            '--threads',
+            '-j', '--threads',
             type=int,
-            default=1,
+            default=int(default_threads) if default_threads else None,
             metavar='N',
-            help='Use N threads for parallel processing',
+            help='Use N threads for parallel processing (env: RGREP_THREADS)',
         )
         
         # Regex options
@@ -197,10 +203,9 @@ Examples:
         """Parse command line arguments and return search options and file paths."""
         parsed = self.parser.parse_args(args)
         
-        # Validate patterns
-        patterns = self._extract_patterns(parsed)
-        if not patterns:
-            self.parser.error("No pattern specified. Use PATTERN argument or -e option.")
+        # Validate pattern
+        if not parsed.pattern:
+            self.parser.error("no pattern provided")
         
         # Handle context options
         context_before = parsed.before_context
@@ -220,17 +225,16 @@ Examples:
         regex_flags = 0
         if parsed.ignore_case:
             regex_flags |= re.IGNORECASE
+        if parsed.dotall:
+            regex_flags |= re.DOTALL
         
-        # Create search patterns
-        search_patterns = []
-        for pattern_str in patterns:
-            search_pattern = SearchPattern(
-                pattern=pattern_str,
-                match_type=match_type,
-                regex_flags=regex_flags,
-                is_regex=not parsed.fixed_strings
-            )
-            search_patterns.append(search_pattern)
+        # Create search pattern (single pattern with Boolean expression support)
+        search_pattern = SearchPattern(
+            pattern=parsed.pattern,
+            match_type=match_type,
+            regex_flags=regex_flags,
+            is_regex=not parsed.fixed_strings
+        )
         
         # Determine if highlighting should be enabled
         highlight_matches = self._should_highlight(parsed)
@@ -238,9 +242,12 @@ Examples:
         # Handle binary files
         ignore_binary = parsed.binary_files == 'without-match'
         
+        # Determine number of threads
+        max_threads = parsed.threads if parsed.threads is not None else 1
+        
         # Create search options
         options = SearchOptions(
-            patterns=search_patterns,
+            patterns=[search_pattern],
             invert_match=parsed.invert_match,
             count_only=parsed.count,
             quiet=parsed.quiet,
@@ -249,38 +256,18 @@ Examples:
             highlight_matches=highlight_matches,
             recursive=parsed.recursive,
             ignore_binary=ignore_binary,
-            max_threads=parsed.threads,
+            max_threads=max_threads,
             follow=parsed.follow
         )
         
-        # Get file paths - when using -e, treat positional pattern as file path
-        file_paths = list(parsed.files)  # Copy the files list
-        if parsed.patterns and parsed.pattern:
-            # When -e patterns are used, treat the positional pattern as a file path
-            file_paths.append(parsed.pattern)
+        # Get file paths
+        file_paths = list(parsed.files)
         
         # If no files specified, default to stdin
         if not file_paths:
-            if parsed.patterns:
-                self.parser.error("When using -e/--regexp, you must specify files to search")
             file_paths = ['-']
         
         return options, file_paths
-    
-    @staticmethod
-    def _extract_patterns(parsed: argparse.Namespace) -> List[str]:
-        """Extract patterns from parsed arguments."""
-        patterns = []
-        
-        # Add patterns from -e/--regexp options
-        if parsed.patterns:
-            patterns.extend(parsed.patterns)
-        
-        # Add the main pattern argument only if no -e patterns were specified
-        if parsed.pattern and not parsed.patterns:
-            patterns.append(parsed.pattern)
-        
-        return patterns
     
     @staticmethod
     def _should_highlight(parsed: argparse.Namespace) -> bool:

@@ -65,11 +65,9 @@ class PrepApplication:
         if options.follow:
             return self._execute_file_watch(options, file_paths)
         
-        # Handle stdin input
+        # Handle stdin input - search content directly
         if file_paths == ['-']:
-            file_paths = self._read_from_stdin()
-            if not file_paths:
-                return 1
+            return self._search_stdin(options)
         
         # Validate file paths
         validated_paths = self._validate_file_paths(file_paths, options.recursive)
@@ -94,18 +92,67 @@ class PrepApplication:
                 print(output)
             return 0 if result.total_matches > 0 else 1
 
-    @staticmethod
-    def _read_from_stdin() -> List[str]:
-        """Read file paths from stdin."""
+    def _search_stdin(self, options: SearchOptions) -> int:
+        """Search content from stdin."""
         try:
-            lines = []
+            matches = []
+            line_number = 0
+            
+            # Read and search stdin line by line
             for line in sys.stdin:
-                line = line.strip()
-                if line:
-                    lines.append(line)
-            return lines
+                line_number += 1
+                line_content = line.rstrip('\n\r')
+                
+                # Find matches in this line
+                line_matches = self.pattern_matcher.find_matches(line_content, line_number, options)
+                should_include = self.pattern_matcher.should_include_line(line_matches, options)
+                
+                if should_include:
+                    if options.invert_match:
+                        # For invert match, create a dummy match
+                        from ..domain.models import MatchResult
+                        match = MatchResult(
+                            line_number=line_number,
+                            line_content=line_content,
+                            match_start=0,
+                            match_end=0,
+                            pattern=options.patterns[0] if options.patterns else None
+                        )
+                        matches.append(match)
+                    else:
+                        matches.extend(line_matches)
+                    
+                    # Early exit for quiet mode
+                    if options.quiet:
+                        return 0
+                    
+                    # Print immediately for non-quiet, non-count mode
+                    if not options.count_only:
+                        for match in (line_matches if not options.invert_match else [match]):
+                            formatted = self._format_stdin_match(match, options)
+                            if formatted:
+                                print(formatted)
+            
+            # Handle count mode
+            if options.count_only:
+                print(len(matches))
+                return 0 if matches else 1
+            
+            # Return based on whether we found matches
+            return 0 if matches else 1
+            
         except (EOFError, KeyboardInterrupt):
-            return []
+            return 130
+    
+    def _format_stdin_match(self, match, options):
+        """Format a match from stdin."""
+        line_content = match.line_content
+        
+        # Apply highlighting if requested
+        if options.highlight_matches:
+            line_content = self.output_formatter.highlight_matches([match], line_content)
+        
+        return f"{match.line_number}:{line_content}"
     
     @staticmethod
     def _validate_file_paths(file_paths: List[str], recursive: bool) -> List[str]:
@@ -153,7 +200,7 @@ class PrepApplication:
         
         # File watching doesn't support recursive mode
         if options.recursive:
-            print("prep: file watching (-f/--follow) does not support recursive (-r) mode", file=sys.stderr)
+            print("prep: file watching (-f/--follow) does not support recursive (-R) mode", file=sys.stderr)
             return 2
         
         # Execute the appropriate file watching use case
